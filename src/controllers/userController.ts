@@ -159,6 +159,29 @@ export const getWorkspace = async (req: Request, res: Response) => {
     }
 };
 
+export const deleteWorkspace = async (req:Request,res:Response)=>{
+    const {clerkId,workspaceId} = req.params;
+    try{
+        const user = await User.findOne({clerkId});
+        if(!user){
+            return res.status(404).json({message:"User not found"});
+        }
+        const workspace = await Workspace.findById(workspaceId)
+        if(!workspace){
+            return res.status(404).json({message:"Workspace not found"});
+        }
+
+        user.workspaces = user.workspaces.filter(
+            (id) =>id.toString() !== workspaceId
+        );
+        await user.save();
+        await Workspace.findByIdAndDelete(workspaceId);
+        res.status(200).json({message : "Workspace deleted successfully"})
+    }catch(err){
+        res.status(500).json({message : "Error while deleting workspace"})
+    }
+}
+
 export const createNewNote = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
     const { heading, content, type } = req.body;

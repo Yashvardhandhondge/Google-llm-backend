@@ -56,4 +56,6 @@ router.post("/analytics/report-for-workspace", (0, clerk_sdk_node_1.ClerkExpress
 router.get("/analytics/properties", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.getGaProperties);
 // @ts-ignore
 router.post("/getWorkspace-report/:workspaceId", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.generateReport);
+// @ts-ignore
+router.delete("/workspaces/:clerkId/:workspaceId", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.deleteWorkspace);
 exports.default = router;

@@ -56,7 +56,10 @@ function getContentThroughUrl(url) {
         try {
             const { data: html } = yield axios_1.default.get(url);
             const $ = cheerio.load(html);
-            const bodyText = $("body").text().trim();
+            const bodyText = $("p, h1, h2, h3, span, li")
+                .map((_, element) => $(element).text().trim())
+                .get()
+                .join(" ");
             return bodyText ? bodyText.substring(0, 3000) : "No content found.";
         }
         catch (error) {
@@ -75,25 +78,23 @@ function summarizePDFFile(file, openAIApiKey) {
         const base64PDF = file.buffer.toString("base64");
         // Step 2: Send the file content to OpenAI for summarization
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-4-32k", // Use GPT-4 with higher token limits
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.",
+                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
                 },
             ],
-            max_tokens: 8000, // Adjust based on the model and expected output
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
                 "Content-Type": "application/json",
             },
         });
-        // Step 3: Process the response
         const messageContent = (_c = (_b = (_a = response.data.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content;
         if (!messageContent) {
             throw new Error("No content received in the response");
@@ -105,18 +106,17 @@ function summarizeContent(content, openAIApiKey) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `Please summarize the following content in atmost 1000 words:\n\n${content}`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -134,18 +134,17 @@ function suggetionChat(content, openAIApiKey) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `${content}`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -182,11 +181,11 @@ function extractTextFromFile(file, openAIApiKey) {
         }
     });
 }
-const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, question, openAIApiKey }) {
+const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, question, openAIApiKey, }) {
     var _b, _c, _d, _e;
     try {
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
@@ -194,10 +193,9 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
                 },
                 {
                     role: "user",
-                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side`,
+                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -216,30 +214,30 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
     }
 });
 exports.respondToConversation = respondToConversation;
-const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey }) {
+const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey, }) {
     var _b, _c, _d, _e;
     try {
         const prompt = `
-            Please provide a detailed report and key insights for the following workspace:
+            Please create a detailed report with visualization included in form of tables , charts, images from the following data :
             Workspace Name: ${workspaceName}
             Notes: ${notes.join("\n\n")}
             Sources: ${sources.join("\n\n")} in ${generateReportText}.
             Please provide in points, first for all the notes and then for all the sources.
-            And if any data is present which can be used to create any graph please make that.
+            And if any data is present please create table with it and highlight any important information.
+            Please give the answer in markdown format
         `;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant. Summarize and provide insights based on the provided data.",
+                    content: "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: prompt,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -262,7 +260,7 @@ const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, vo
     var _a, _b, _c, _d;
     try {
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
@@ -270,10 +268,9 @@ const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, vo
                 },
                 {
                     role: "user",
-                    content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis.`,
+                    content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis. Please give the answer in markdown format`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,

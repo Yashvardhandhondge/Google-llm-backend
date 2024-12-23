@@ -68,6 +68,10 @@ export async function summarizePDFFile(
     );
 
     const messageContent = response.data.choices?.[0]?.message?.content;
+
+ 
+
+
     if (!messageContent) {
         throw new Error("No content received in the response");
     }

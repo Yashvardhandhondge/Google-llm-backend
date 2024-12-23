@@ -23,7 +23,8 @@ import {
     getGaProperties,
     generateReport,
     getGaReportForWorkspace,
-    createConversationOfSuggestion
+    createConversationOfSuggestion,
+    deleteWorkspace
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
@@ -109,5 +110,8 @@ router.get("/analytics/properties", ClerkExpressRequireAuth(), getGaProperties);
 
 // @ts-ignore
 router.post("/getWorkspace-report/:workspaceId", ClerkExpressRequireAuth(), generateReport);
+
+// @ts-ignore
+router.delete("/workspaces/:clerkId/:workspaceId", ClerkExpressRequireAuth(), deleteWorkspace);
 
 export default router;

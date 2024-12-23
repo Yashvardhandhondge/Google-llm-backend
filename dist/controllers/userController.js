@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
+exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.deleteWorkspace = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const Workspace_1 = __importDefault(require("../models/Workspace"));
 const Note_1 = __importDefault(require("../models/Note"));
@@ -66,7 +66,7 @@ const saveOpenAikey = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
-            propertyId: user.propertyId === '' ? false : true
+            propertyId: user.propertyId === "" ? false : true,
         });
     }
     catch (error) {
@@ -153,6 +153,27 @@ const getWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.getWorkspace = getWorkspace;
+const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { clerkId, workspaceId } = req.params;
+    try {
+        const user = yield User_1.default.findOne({ clerkId });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const workspace = yield Workspace_1.default.findById(workspaceId);
+        if (!workspace) {
+            return res.status(404).json({ message: "Workspace not found" });
+        }
+        user.workspaces = user.workspaces.filter((id) => id.toString() !== workspaceId);
+        yield user.save();
+        yield Workspace_1.default.findByIdAndDelete(workspaceId);
+        res.status(200).json({ message: "Workspace deleted successfully" });
+    }
+    catch (err) {
+        res.status(500).json({ message: "Error while deleting workspace" });
+    }
+});
+exports.deleteWorkspace = deleteWorkspace;
 const createNewNote = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { workspaceId } = req.params;
     const { heading, content, type } = req.body;
@@ -197,6 +218,24 @@ const getAllNotes = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getAllNotes = getAllNotes;
+function splitContent(content, chunkSize = 10000) {
+    const chunks = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+        chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+function summarizeLargeContent(content, apiKey) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const chunks = splitContent(content);
+        let finalSummary = "";
+        for (const chunk of chunks) {
+            const summary = yield (0, Source_1.summarizeContent)(chunk, apiKey);
+            finalSummary += summary + "\n\n";
+        }
+        return finalSummary.trim();
+    });
+}
 const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { workspaceId } = req.params;
@@ -212,16 +251,26 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(410).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(410)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         if (uploadType === "file" && req.file) {
-            const fileUrl = yield (0, Source_1.uploadFiles)(file);
+            let fileUrl;
+            try {
+                fileUrl = yield (0, Source_1.uploadFiles)(file);
+            }
+            catch (error) {
+                return res.status(400).json({
+                    message: "File upload failed. Please upload a smaller file or try again.",
+                });
+            }
             const content = yield (0, Source_1.extractTextFromFile)(file, user.openAikey);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url: fileUrl,
                 summary,
-                name: req.file.originalname,
+                name: req.file.originalname.split(".").slice(0, -1).join("."),
                 uploadType,
             });
             yield newSource.save();
@@ -230,9 +279,8 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.status(200).json({ newSource, message: "Source Added" });
         }
         else if (uploadType === "url" && url) {
-            // If URL is provided, process it as usual
             const content = yield (0, Source_1.getContentThroughUrl)(url);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url,
                 summary,
@@ -490,8 +538,8 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
-        if (user.openAikey === '') {
-            return res.json({ message: 'Please provide OpenAI key' });
+        if (user.openAikey === "") {
+            return res.json({ message: "Please provide OpenAI key" });
         }
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -691,7 +739,7 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             sources: sourcesContent,
             workspaceName: workspace.name,
             generateReportText,
-            openAIApiKey: user.openAikey
+            openAIApiKey: user.openAikey,
         });
         res.json({ summary });
     }
